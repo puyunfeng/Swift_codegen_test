@@ -189,8 +189,19 @@ swiftCodegen {
 ./gradlew generateSwiftEnums
 ```
 
-输出目录在 Xcode 工程里**手动加一次**（文件夹引用）之后，每次重新生成都会被覆盖更新；
-内容没变化时处理器不会重写文件，所以不会触发多余的 Swift 增量编译。
+Xcode 只编译「属于 target 的文件」，而生成的 `.swift` 是 Gradle/KSP 直接写到磁盘的，
+不会修改工程文件，所以要分两种情况：
+
+- **Xcode 16+ 同步文件夹（本仓库，`objectVersion = 77`）**：`iosApp/iosApp` 是
+  `PBXFileSystemSynchronizedRootGroup`，目录里有什么文件就编译什么文件。生成到
+  `iosApp/iosApp/Generated` 会被自动编译，工程文件不用动。
+- **老工程（用 group 逐文件登记）**：需要把生成目录加进 target 的 Compile Sources **一次**。
+  建议用「文件夹引用」（Add Files 时选 Create folder references，蓝色文件夹），这样以后
+  新增 `@GenerateSwiftEnum` 类型产生的新文件也会自动被编译；用「创建组」的话每多一个
+  文件都要重新加一次。用 XcodeGen/Tuist 则把目录声明进 `sources` 即可。
+
+重复生成不会破坏引用：输出路径稳定，且内容没变化时处理器不重写文件，
+所以 Xcode 的增量编译不会被无意义地触发。
 
 ## 配置项
 
@@ -238,7 +249,8 @@ case 名取子类型简单名：去掉 `Intent` 后缀、首字母小写（`OneF
 - 只支持 sealed class/interface；枚举类子类型（`enum class`）不支持。
 - 一个注解生成一个文件，文件名是 `<swiftEnumName>.swift`。
 - `CONCURRENT` 模式下每个被注解类型必须写到不同文件，否则会互相覆盖。
-- 生成目录需要在 Xcode 工程里手动添加一次。
+- 生成目录必须落在 Xcode 会编译的路径下：Xcode 16+ 的同步文件夹工程（本仓库）自动生效，
+  老工程需要手动加一次，见「生成并接入 Xcode」。
 - 插件内部注入的注解/处理器版本与插件自身版本一致（同一次发布），升级时三者一起升级。
 
 ## 更多
