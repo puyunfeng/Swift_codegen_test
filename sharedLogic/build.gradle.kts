@@ -41,6 +41,6 @@ kotlin {
     }
 }
 swiftCodegen {
-    swiftModuleName.set("sharedLogic")
+    swiftModuleName.set("SharedLogic")
     outputSubDir.set("iosApp/iosApp/Generated")
 }

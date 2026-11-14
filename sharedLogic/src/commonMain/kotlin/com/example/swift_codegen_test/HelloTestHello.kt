@@ -4,7 +4,6 @@ import com.example.swift_codegen.GenerateSwiftEnum
 @GenerateSwiftEnum
 sealed interface HelloTestHello {
     object OneTab : HelloTestHello
-    object ThreeTab : HelloTestHello
     class OneFun(val s: String, val s2: String) : HelloTestHello
     class TwoFun(val s: String, val s2: String, val s3: String, val s4: String) : HelloTestHello
     class ThreeFun(val s: String, val s2: String, val s3: String) : HelloTestHello

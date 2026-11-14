@@ -32,3 +32,6 @@ dependencyResolutionManagement {
 include(":androidApp")
 include(":sharedLogic")
 include(":sharedUI")
+include(":swift-codegen")
+include(":swift_codegen_annotations")
+include(":swift_codegen_gradle_plugin")
