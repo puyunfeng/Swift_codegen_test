@@ -1,0 +1,7 @@
+TEAM_ID=
+
+PRODUCT_NAME=Swift_codegen_test
+PRODUCT_BUNDLE_IDENTIFIER=com.example.swift_codegen_test.Swift_codegen_test$(TEAM_ID)
+
+CURRENT_PROJECT_VERSION=1
+MARKETING_VERSION=1.0
