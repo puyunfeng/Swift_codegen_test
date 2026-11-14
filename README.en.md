@@ -105,20 +105,21 @@ When it runs: the plugin adds the processor to every `kspIos*` configuration, an
 
 ## Integration
 
-Requires Kotlin Multiplatform, KSP, and at least one declared iOS target.
+Requires Kotlin Multiplatform, KSP, and at least one declared iOS target. The sample module
+`sharedLogic` in this repo is wired exactly this way, so you can copy from it.
 
 ### 1. Configure the repositories
 
 Artifacts are published to GitHub Packages
 (`https://maven.pkg.github.com/puyunfeng/Swift_codegen_test`). `pluginManagement` resolves the
-plugin, while `dependencyResolutionManagement` resolves the annotations and processor dependencies
-the plugin injects, so both need the repository. GitHub Packages requires credentials even to read
-public packages (`read:packages`):
+plugin marker, while `dependencyResolutionManagement` resolves the annotations and processor
+dependencies the plugin injects, so both need the repository:
 
 ```kotlin
 // settings.gradle.kts
 pluginManagement {
     repositories {
+        mavenLocal()
         maven {
             url = uri("https://maven.pkg.github.com/puyunfeng/Swift_codegen_test")
             credentials {
@@ -126,13 +127,21 @@ pluginManagement {
                 password = providers.gradleProperty("gpr.key").orNull
             }
         }
-        gradlePluginPortal()
+        google {
+            mavenContent {
+                includeGroupAndSubgroups("androidx")
+                includeGroupAndSubgroups("com.android")
+                includeGroupAndSubgroups("com.google")
+            }
+        }
         mavenCentral()
+        gradlePluginPortal()
     }
 }
 
 dependencyResolutionManagement {
     repositories {
+        mavenLocal()
         maven {
             url = uri("https://maven.pkg.github.com/puyunfeng/Swift_codegen_test")
             credentials {
@@ -145,30 +154,56 @@ dependencyResolutionManagement {
 }
 ```
 
-Credentials also live in `~/.gradle/gradle.properties`:
+Putting it before `google()` / `mavenCentral()` is fine: `google()` is already restricted by
+`mavenContent` to the androidx / com.android / com.google groups, so it would never look up
+`com.example.swift_codegen` anyway. And when no credentials are configured, Gradle gets a 401 from
+this repository and simply tries the next one, so the build is not broken.
+
+Credentials go into `~/.gradle/gradle.properties`:
 
 ```properties
 gpr.user=<GitHub username>
 gpr.key=<PAT with read:packages>
 ```
 
-### 2. Apply the plugins
+### 2. Version catalog (recommended)
 
-The KSP version has to match your Kotlin version; the version of
-`com.example.swift_codegen` is the published version.
+Register the version and a plugin alias in `gradle/libs.versions.toml`:
+
+```toml
+[versions]
+ksp = "2.3.13"          # pairs with Kotlin 2.4.21
+swiftCodegen = "1.0.0"
+
+[plugins]
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+swiftCodegen = { id = "com.example.swift_codegen", version.ref = "swiftCodegen" }
+```
+
+Using an alias instead of hardcoding `id("com.example.swift_codegen") version "1.0.0"` in every
+module keeps the version in one place, so an upgrade touches a single line.
+
+> In this repo `swiftCodegenVersion` in `gradle.properties` is the version the three libraries are
+> **published** as, while `swiftCodegen` in `libs.versions.toml` is the version the sample
+> **consumes**. The sample resolves the plugin from mavenLocal, so the two must match.
+
+### 3. Apply the plugins
 
 ```kotlin
 plugins {
-    kotlin("multiplatform") version "2.4.21"
-    id("com.google.devtools.ksp") version "2.3.13"
-    id("com.example.swift_codegen") version "1.0.0"
+    alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.androidMultiplatformLibrary)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.swiftCodegen)
 }
 ```
 
-The processor and annotation dependencies are injected by the plugin, so there is no need to
-declare them by hand.
+The KSP version has to match your Kotlin version (2.3.13 for 2.4.21 here). The order relative to the
+codegen plugin does not matter: the plugin hooks in lazily through `pluginManager.withPlugin`, so
+either order works — KSP first is only convention. The processor and annotation dependencies are
+injected by the plugin, so there is nothing to declare by hand.
 
-### 3. Declare an iOS target
+### 4. Declare an iOS target
 
 The generated file `import`s your framework, so the target and framework names have to line up:
 
@@ -183,16 +218,18 @@ kotlin {
 }
 ```
 
-### 4. Configure
+### 5. Configure
 
 ```kotlin
 swiftCodegen {
-    swiftModuleName.set("SharedLogic")            // the import in the generated file
-    outputSubDir.set("iosApp/iosApp/Generated")   // relative to the repository root
+    // must equal the iOS framework's baseName, it is what the generated file `import`s
+    swiftModuleName.set("SharedLogic")
+    // relative to the repository root; inside an Xcode 16 synchronized folder, so it compiles
+    outputSubDir.set("iosApp/iosApp/Generated")
 }
 ```
 
-### 5. Generate and hook it up in Xcode
+### 6. Generate and hook it up in Xcode
 
 ```bash
 ./gradlew generateSwiftEnums

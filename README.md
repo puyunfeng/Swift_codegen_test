@@ -102,18 +102,20 @@ func send(_ intent: HelloTestHelloEnum, to viewModel: ViewModel) {
 
 ## 集成
 
-需要 Kotlin Multiplatform + KSP，并且至少声明一个 iOS target。
+需要 Kotlin Multiplatform + KSP，并且至少声明一个 iOS target。本仓库的示例工程 `sharedLogic`
+就是按下面这套配置接的，可以对照着看。
 
 ### 1. 配置仓库
 
 产物发布在 GitHub Packages（`https://maven.pkg.github.com/puyunfeng/Swift_codegen_test`）。
-`pluginManagement` 用于解析插件，`dependencyResolutionManagement` 用于解析插件自动注入的
-注解与处理器依赖，两处都要加；GitHub Packages 即使公开包读取也要凭据（`read:packages`）：
+`pluginManagement` 负责解析插件标记，`dependencyResolutionManagement` 负责解析插件自动注入的
+注解与处理器依赖，两处都要加：
 
 ```kotlin
 // settings.gradle.kts
 pluginManagement {
     repositories {
+        mavenLocal()
         maven {
             url = uri("https://maven.pkg.github.com/puyunfeng/Swift_codegen_test")
             credentials {
@@ -121,13 +123,21 @@ pluginManagement {
                 password = providers.gradleProperty("gpr.key").orNull
             }
         }
-        gradlePluginPortal()
+        google {
+            mavenContent {
+                includeGroupAndSubgroups("androidx")
+                includeGroupAndSubgroups("com.android")
+                includeGroupAndSubgroups("com.google")
+            }
+        }
         mavenCentral()
+        gradlePluginPortal()
     }
 }
 
 dependencyResolutionManagement {
     repositories {
+        mavenLocal()
         maven {
             url = uri("https://maven.pkg.github.com/puyunfeng/Swift_codegen_test")
             credentials {
@@ -140,28 +150,54 @@ dependencyResolutionManagement {
 }
 ```
 
-凭据同样放在 `~/.gradle/gradle.properties`：
+放在 `google()` / `mavenCentral()` 之前即可：`google()` 已经被 `mavenContent` 限制在
+androidx / com.android / com.google 三组，本来也不会去查 `com.example.swift_codegen`；
+而没有配凭据时，Gradle 在这个仓库拿到 401 会继续尝试下一个仓库，不会让构建失败。
+
+凭据放在 `~/.gradle/gradle.properties`：
 
 ```properties
 gpr.user=<GitHub 用户名>
 gpr.key=<read:packages 的 PAT>
 ```
 
-### 2. 应用插件
+### 2. 版本目录（推荐）
 
-KSP 版本需要和你的 Kotlin 版本匹配；`com.example.swift_codegen` 的版本就是发布版本。
+`gradle/libs.versions.toml` 里登记版本和插件别名：
+
+```toml
+[versions]
+ksp = "2.3.13"          # 与 Kotlin 2.4.21 配套
+swiftCodegen = "1.0.0"
+
+[plugins]
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+swiftCodegen = { id = "com.example.swift_codegen", version.ref = "swiftCodegen" }
+```
+
+用别名而不是在每个模块里硬编码 `id("com.example.swift_codegen") version "1.0.0"`，
+是为了让版本号集中在 `libs.versions.toml` 一处，升级时只改一行。
+
+> 本仓库里 `gradle.properties` 的 `swiftCodegenVersion` 是这三个库**发布**用的版本，
+> `libs.versions.toml` 的 `swiftCodegen` 是示例工程**消费**用的版本。示例从 mavenLocal
+> 解析插件，所以两者要一致。
+
+### 3. 应用插件
 
 ```kotlin
 plugins {
-    kotlin("multiplatform") version "2.4.21"
-    id("com.google.devtools.ksp") version "2.3.13"
-    id("com.example.swift_codegen") version "1.0.0"
+    alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.androidMultiplatformLibrary)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.swiftCodegen)
 }
 ```
 
+KSP 版本要与 Kotlin 版本匹配（这里的 2.3.13 对 2.4.21）。与 codegen 插件的先后顺序无关：
+插件内部用 `pluginManager.withPlugin` 惰性挂接，先应用哪个都生效，习惯上把 KSP 写在前面。
 处理器和注解依赖由插件注入，不需要手动声明。
 
-### 3. 声明 iOS target
+### 4. 声明 iOS target
 
 生成出来的文件要 `import` 你的 framework，所以 target 与 framework 名要对得上：
 
@@ -176,16 +212,18 @@ kotlin {
 }
 ```
 
-### 4. 配置
+### 5. 配置
 
 ```kotlin
 swiftCodegen {
-    swiftModuleName.set("SharedLogic")            // 生成文件里的 import
-    outputSubDir.set("iosApp/iosApp/Generated")   // 相对仓库根目录
+    // 必须等于 iOS framework 的 baseName，因为生成文件里会 `import` 它
+    swiftModuleName.set("SharedLogic")
+    // 相对"仓库根目录"；落在 Xcode 16 的同步文件夹里，生成后自动参与编译
+    outputSubDir.set("iosApp/iosApp/Generated")
 }
 ```
 
-### 5. 生成并接入 Xcode
+### 6. 生成并接入 Xcode
 
 ```bash
 ./gradlew generateSwiftEnums
