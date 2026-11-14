@@ -1,3 +1,5 @@
+[English](./README.en.md) | 简体中文
+
 # swift_codegen — 把 Kotlin sealed type 变成 Swift enum
 
 Kotlin Multiplatform 里的 `sealed interface` 到 Swift 就退化成一堆 Kotlin 导出的类，
