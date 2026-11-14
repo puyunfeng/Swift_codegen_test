@@ -5,11 +5,24 @@ import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.provider.Property
+import java.util.Properties
 
 private const val GROUP = "com.example.swift_codegen"
 private const val PROCESSOR_ARTIFACT = "swift_codegen"
 private const val ANNOTATIONS_ARTIFACT = "swift_codegen_annotations"
-private const val VERSION = "1.0.0"
+
+/**
+ * Version baked in at build time by the `generateVersionResource` task, so the
+ * artifacts this plugin injects always match the plugin's own published version.
+ */
+private val VERSION: String by lazy {
+    SwiftCodegenPlugin::class.java.getResourceAsStream("version.properties")
+        ?.use { Properties().apply { load(it) }.getProperty("version") }
+        ?: throw GradleException(
+            "Missing version.properties. The plugin was built without generateVersionResource; " +
+                "run the Gradle build instead of using stale classes.",
+        )
+}
 
 /**
  * Configures KSP so [com.example.swift_codegen.GenerateSwiftEnum] declarations
