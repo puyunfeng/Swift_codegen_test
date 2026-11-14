@@ -229,6 +229,17 @@ swiftCodegen {
 ./gradlew generateSwiftEnums
 ```
 
+想确认这次到底生成/跳过了什么，或者需要强制重跑：
+
+```bash
+./gradlew generateSwiftEnums --info --rerun-tasks
+```
+
+`--info` 才会显示处理器自己的日志（`[ksp] Generated <path>` /
+`[ksp] Swift enum is already up to date`）。只加 `--info` 通常看不到东西：输入没变时
+`kspKotlinIos*` 直接 UP-TO-DATE，处理器根本不会运行。`--rerun-tasks` 会忽略 up-to-date 检查，
+代价是整条链（Kotlin/Native 编译 + KSP）都重跑，所以只用于排查，日常构建别带。
+
 Xcode 只编译「属于 target 的文件」，而生成的 `.swift` 是 Gradle/KSP 直接写到磁盘的，
 不会修改工程文件，所以要分两种情况：
 

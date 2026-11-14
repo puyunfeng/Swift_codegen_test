@@ -235,6 +235,18 @@ swiftCodegen {
 ./gradlew generateSwiftEnums
 ```
 
+To see what was actually generated or skipped, or to force a re-run:
+
+```bash
+./gradlew generateSwiftEnums --info --rerun-tasks
+```
+
+`--info` is what surfaces the processor's own log lines (`[ksp] Generated <path>` /
+`[ksp] Swift enum is already up to date`). `--info` alone usually shows nothing: when the inputs
+have not changed, `kspKotlinIos*` is UP-TO-DATE and the processor never runs. `--rerun-tasks`
+ignores the up-to-date checks, at the cost of re-running the whole chain (Kotlin/Native compile
+plus KSP), so keep it for debugging rather than everyday builds.
+
 Xcode only compiles files that belong to the target, and the generated `.swift` files are written
 straight to disk by Gradle/KSP without touching the project file. That leaves two cases:
 
